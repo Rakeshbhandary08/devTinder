@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "description": "Tinder for devs",
   "main": "index.js",
-  
   "scripts": {
-  "start": "node src/app.js",
-  "dev": "nodemon src/app.js"
-},
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
   "keywords": [
     "node.js",
     "javascript",
@@ -16,6 +15,6 @@
   "author": "Rakesh Bhandary",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.2.1" 
+    "express": "^5.2.1"
   }
 }
