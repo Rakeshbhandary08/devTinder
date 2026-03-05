@@ -4,26 +4,141 @@ const connectDB = require("./config/database");
 const app=express();   //create a server using server. //we have listen now
 const User=require("./models/user");
 //write the upi using post method which will create the user; (post/signup)
+const {validateSignUpData}=require("./utils/validation");
+const bcrypt = require('bcrypt');
+const cookieParser=require('cookie-parser')   //it is a middleware
+const jwt=require('jsonwebtoken');
 
-app.post("/signup",async (req,res)=>{
-    
+
+app.use("/",express.json());    //This is how to use in-build middleware of express
+app.use(cookieParser());         //It is a middleware used to read the cookie send by the browser
+
+
+
+app.post("/submit", async (req, res) => {
+  try {
+
+    // 1️⃣ Validate data
+    validateSignUpData(req);
+
+    // 2️⃣ Destructure body
+    const { firstName, lastName, emailId, password } = req.body;
+
+    // 3️⃣ Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // 4️⃣ Create user with hashed password
     const user = new User({
-        firstName:"Muzan",
-        lastName:"kibutsuji",
-        emailId:"akaza@gmail.com",
-        password:"tanjiro@123"
-        
-    });  //i am creating a new instance(document) of a user model
+      firstName,
+      lastName,
+      emailId,
+      password: passwordHash
+    });
 
+    // 5️⃣ Save to DB
+    await user.save();
+
+    res.status(200).send("User created successfully");
+
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
+});
+
+//Authentication System
+app.post("/login",async (req,res) => {
     try{
-     await user.save()   //now data is saved to the database.
-     res.send("Data is send successfully");
+       const {emailId,password}=req.body;  //req se data le liya   
+       //First valid the email;
+       const user=await User.findOne({emailId:emailId});
+       if(!user){
+        throw new Error("Please sign-up first")
+       }
+       //Let's check the password now;
+       const isPasswordValid=await bcrypt.compare(password,user.password);
+
+       if(isPasswordValid){
+
+        //create a JWT token
+
+        const token=await jwt.sign({_id:user._id},"DevTinder@9298");
+        console.log(token);
+
+        //Add the token to cookie and send back the responce to the user
+        res.cookie("token",token);
+        res.send("Login successfully");
+        
+       }
+       else{
+        throw new Error("Correct password daal Madharchod")
+       }
     }
     catch(err){
-        res.status(400).send("Error saving the user "+ err.message)
+        res.status(404).send(err.message)
     }
+})
+
+app.get("/profile",async (req,res)=>{
+    try{
+        const cookie=req.cookies;
+    const {token}=cookie;
+
+    if(!token){
+        throw new Error("Token nahi hai cookie me bsdk")
+    }
+
+    
+
+    //Validate the token
+
+    const decodeMessage = await jwt.verify(token,"DevTinder@9298");
+    console.log(decodeMessage);
+
+    const {_id}=decodeMessage;
+
+    const user= await User.findById(_id);
+
+    const {firstName}=user;
+
+   console.log("Logged In user id: "+ firstName);
+
+    res.send(user);
+    }
+
+    catch(err){
+        res.status(404).send(err.message)
+    }
+
+    
     
 })
+
+
+app.patch("/user/:id",async (req,res)=>{
+    const userId=req.params._id;
+    const data=req.body;
+   
+    try{
+    const allowUpdate=["firstName","about","age","gender","skills"];
+
+    const isUpdateAllowed=Object.keys(data).every((k)=>allowUpdate.includes(k));
+
+    if(!isUpdateAllowed){
+        throw new Error("Updatation not allowed, sorry for the inconvience")
+    }
+    const user=await User.findByIdAndUpdate(req.params.id,data,{
+        returnDocument:"after",
+        runValidators:true,
+    })
+    res.send("User updated successfully")
+}
+   catch(err){
+     res.status(400).send(err.message)
+   }
+
+})
+
+   
 
 
 //First connect to the database then listen to the api calls on some port
