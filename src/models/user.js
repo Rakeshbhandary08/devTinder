@@ -1,76 +1,99 @@
-const mongoose=require('mongoose');;
+const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const validator = require("validator");
 
-const validator=require('validator');
+const userSchema = new mongoose.Schema({
 
-const userSchema =new mongoose.Schema({   //schema is a structure of data
-    firstName:{
-        type:String
-    },
-    lastName:{
-        type:String
-    },
-    emailId:{
-        type:String,
-        required:true,
-        
-        lowercase:true,
-        trim:true,
-        validate(value){
-            if(!validator.isEmail(value)){
-              throw new Error("Invalid email hai chutiye")
-            }
-        }
-    },
-    password:{
-        type:String,
-        required:true,
-        validate(pass){
-            if(!validator.isStrongPassword(pass)){
-                throw new Error("Thoda or strong password bana laude")
-            }
-        }
-    },
-    age:{
-        type:Number,
-        min:18,
-        max:60,
-        validate(num){
-            if(!validator.isNumeric(num)){
-                throw new Error("Bahenchod number likh")
-            }
-        }
-    },
-    gender:{
-        type:String,
-        lowercase:true,
-        validate(value){
-            if(!["male","female","other"].includes(value)){
-               throw new Error("Hizra hai kya?")
-            }
-        },
-    },
-    photoUrl:{
-        type:String,
-        validate(str){
-            if(!validator.isURL(str)){
-                throw new Error("Bakk madharchod")
-            }
-        },
-        //default:"https://imgv3.fotor.com/images/gallery/beautiful-machine-girl-with-blue-eyes-created-by-Fotor-ai-art-creator.jpg"
-    },
-    about:{
-      type:String,
-      //default:"This is a default about of the user"
-    },
-    skills:{
-        type:[String]
+  firstName: { type: String ,
+    index:true
+  },
+
+  lastName: { type: String },
+
+  emailId: {
+    type: String,
+    required: true,
+    lowercase: true,
+    unique:true,
+    trim: true,
+    validate(value) {
+      if (!validator.isEmail(value)) {
+        throw new Error("Invalid email");
+      }
     }
+  },
 
-},{
-    timestamps:true
-})
+  password: {
+    type: String,
+    required: true,
+    validate(pass) {
+      if (!validator.isStrongPassword(pass)) {
+        throw new Error("Weak password");
+      }
+    }
+  },
 
-let userModel=mongoose.model("User",userSchema);   //model is a tool that manages the schema
- //keep it mind that the name will be in Capital of model
-module.exports=userModel;
+  age: {
+    type: Number,
+    min: 18,
+    max: 60
+  },
 
+  gender: {
+    type: String,
+    lowercase: true,
+    enum:{
+      values:["male","female","other"],
+      message:`{VALUE} is not a valid gender.`
+    }
+  },
+
+  photoUrl: {
+    type: String,
+    validate(str) {
+      if (!validator.isURL(str)) {
+        throw new Error("Invalid URL");
+      }
+    }
+  },
+
+  about: { type: String },
+
+  skills: { type: [String] }
+
+}, { timestamps: true });
+
+
+// SCHEMA METHODS FIRST
+
+userSchema.methods.getJWT = async function () {
+  const user = this;
+
+  const token = jwt.sign(
+    { _id: user._id },
+    "DevTinder@9298",
+    { expiresIn: "24h" }
+  );
+
+  return token;
+};
+
+
+userSchema.methods.validatePassword = async function (passwordInputByUser) {
+  const user = this;
+
+  const isPasswordValid = await bcrypt.compare(
+    passwordInputByUser,
+    user.password
+  );
+
+  return isPasswordValid;
+};
+
+
+// CREATE MODEL ONLY ONCE
+
+const User = mongoose.model("User", userSchema);
+
+module.exports = User;
